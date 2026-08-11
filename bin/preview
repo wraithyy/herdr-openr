@@ -20,7 +20,8 @@ target="${target/#\~/$HOME}"
 bold=$'\e[1m'; dim=$'\e[2m'; reset=$'\e[0m'
 print -r -- "${bold}${target:t}${reset}${lineno:+ ${dim}:$lineno${reset}}"
 print -r -- "${target:h}" | fold -w "${FZF_PREVIEW_COLUMNS:-80}" | while IFS= read -r l; do print -r -- "${dim}${l}${reset}"; done
-print -r -- "${dim}${(l:${FZF_PREVIEW_COLUMNS:-80}::─:)}${reset}"
+w="${FZF_PREVIEW_COLUMNS:-80}"
+print -r -- "${dim}${(l:$w::─:)}${reset}"
 
 if [[ -d $target ]]; then
   ls -la "$target"
