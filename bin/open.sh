@@ -47,6 +47,10 @@ if [ "$(printf '%s' "$pane_json" | jq -r '.result.pane.agent // empty')" = "clau
   fi
 fi
 
+printf '%s src=%s pane=%s cwd=%s\n' "$(date '+%H:%M:%S')" \
+  "${transcript:-pane-$scan_source}" "$pane_id" "$cwd" \
+  > "$HOME/.config/herdr/plugins/config/openr/last-source.log" 2>/dev/null
+
 scan_text() {
   if [ -n "$transcript" ]; then
     # tool_use file paths as their own lines + message text (URLs, mentions)
