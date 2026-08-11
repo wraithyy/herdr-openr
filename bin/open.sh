@@ -8,12 +8,18 @@ set -uo pipefail
 herdr_bin="${HERDR_BIN_PATH:-herdr}"
 ctx="${HERDR_PLUGIN_CONTEXT_JSON:-}"
 
+fail() {
+  "$herdr_bin" notification show "openr" --body "$1" 2>/dev/null
+  exit 1
+}
+command -v jq >/dev/null 2>&1 || fail "jq is not installed"
+
 pane_id=""; cwd=""
-if [ -n "$ctx" ] && command -v jq >/dev/null 2>&1; then
+if [ -n "$ctx" ]; then
   pane_id="$(printf '%s' "$ctx" | jq -r '.focused_pane_id // empty')"
   cwd="$(printf '%s' "$ctx" | jq -r '.focused_pane_cwd // .workspace_cwd // empty')"
 fi
-[ -n "$pane_id" ] || exit 1
+[ -n "$pane_id" ] || fail "could not resolve the focused pane"
 [ -d "$cwd" ] || cwd="$HOME"
 
 # user config (scan_source/scan_lines here; file_cmd/url_cmd read by the picker)
@@ -59,14 +65,16 @@ scan_text() {
 candidates="$(
   scan_text | awk '
     {
-      while (match($0, /https?:\/\/[^[:space:]"'"'"')\]>]+/)) {
+      # $ and backtick excluded: extracted text feeds command templates,
+      # keep shell-expansion characters out of candidates entirely
+      while (match($0, /https?:\/\/[^[:space:]"'"'"'`$()\]>]+/)) {
         print "url\t" substr($0, RSTART, RLENGTH)
         $0 = substr($0, RSTART + RLENGTH)
       }
     }
     {
       line = $0
-      while (match(line, /(\/[A-Za-z0-9_.@~-][A-Za-z0-9_.@~\/-]*|[A-Za-z0-9_.@~-]+\/[A-Za-z0-9_.@~\/-]+|[A-Za-z0-9_@~][A-Za-z0-9_.@~\/-]*\.[A-Za-z0-9]{1,10})(:[0-9]+)?/)) {
+      while (match(line, /(\/[A-Za-z0-9_.@~-][A-Za-z0-9_.@~\/-]*|[A-Za-z0-9_.@~-]+\/[A-Za-z0-9_.@~\/-]+|[A-Za-z0-9_@~][A-Za-z0-9_.@~\/-]*\.[A-Za-z0-9][A-Za-z0-9]*)(:[0-9]+)?/)) {
         tok = substr(line, RSTART, RLENGTH)
         line = substr(line, RSTART + RLENGTH)
         print "file\t" tok
@@ -102,7 +110,7 @@ if [ ! -s "$list" ]; then
   exit 0
 fi
 
-exec "$herdr_bin" plugin pane open \
+if ! "$herdr_bin" plugin pane open \
   --plugin openr \
   --entrypoint picker \
   --placement popup \
@@ -111,4 +119,7 @@ exec "$herdr_bin" plugin pane open \
   --env "OPENR_LIST=$list" \
   --env "OPENR_PANE=$pane_id" \
   --env "OPENR_CWD=$cwd" \
-  --focus
+  --focus; then
+  rm -f "$list"
+  fail "could not open the picker popup"
+fi

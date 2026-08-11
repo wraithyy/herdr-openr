@@ -2,7 +2,7 @@ id = "openr"
 name = "Openr"
 version = "0.1.0"
 min_herdr_version = "0.7.0"
-description = "Fuzzy-pick recently mentioned file paths and URLs from the current pane; URLs open in the browser, files in a running Neovim (or a new split)."
+description = "Fuzzy-pick recently mentioned file paths and URLs from the current pane (Claude panes: from the session transcript); URLs open in the browser, files in your editor in a new tab or detached."
 platforms = ["macos", "linux"]
 
 [[actions]]

@@ -1,9 +1,28 @@
 # herdr-openr
 
-Open the files and URLs your terminal — or your AI agent — just mentioned.
+Jump to what your agent just did.
 
-One keypress pops up a fuzzy picker over everything openable in the current
-pane: URLs go to your browser, files open in your editor at the right line.
+One keypress pops up a fuzzy picker over the files and URLs your terminal —
+or your AI agent — just mentioned: URLs go to your browser, files open in
+your editor at the right line.
+
+## Quick start
+
+```bash
+herdr plugin install wraithyy/herdr-openr
+cat >> ~/.config/herdr/config.toml <<'EOF'
+
+[[keys.command]]
+key = "prefix+o"           # prefix = herdr's leader key, ctrl+b by default
+type = "plugin_action"
+command = "openr.pick"
+description = "open file/URL from pane"
+EOF
+herdr server reload-config
+```
+
+Then focus any pane and hit `prefix+o`. Defaults work out of the box —
+`nvim` in a new tab; see [Configure](#configure) for VS Code and others.
 
 ```
 open ▸ pane
@@ -41,31 +60,15 @@ For every other pane it falls back to scanning the visible viewport
 macOS and Linux. Linux additionally uses `xdg-open` and `wl-copy`/`xclip`
 (clipboard is a no-op if neither is installed).
 
-## Install
-
-```bash
-herdr plugin install wraithyy/herdr-openr
-```
-
-…or for local development:
+## Install for local development
 
 ```bash
 git clone https://github.com/wraithyy/herdr-openr
 herdr plugin link ./herdr-openr
 ```
 
-## Bind a key
-
-herdr does not bind keys from plugin manifests — add to
-`~/.config/herdr/config.toml`, then `herdr server reload-config`:
-
-```toml
-[[keys.command]]
-key = "prefix+o"
-type = "plugin_action"
-command = "openr.pick"
-description = "open file/URL from pane"
-```
+The manual keybind in Quick start is needed because herdr does not bind
+keys from plugin manifests.
 
 ## Use it
 
@@ -74,21 +77,27 @@ Focus the pane you were reading, hit your key. Type to filter, then:
 | Key | Action |
 |---|---|
 | `enter` | URL → browser; file → editor at the mentioned line |
-| `ctrl-f` | reveal in Finder (macOS) / open containing dir (Linux) |
+| `ctrl-f` | file: reveal in Finder (macOS) / open containing dir (Linux); URL: same as enter |
 | `ctrl-y` | copy full path/URL to clipboard |
 | `esc` | cancel |
 
 Directories are listed with a trailing `/`. Files that don't exist (relative
-to the pane's cwd) are filtered out, so the list stays short.
+to the pane's cwd) are filtered out, so the list stays short. Known limit:
+paths containing spaces are not detected.
+
+**Troubleshooting**: if the key does nothing, check that
+`herdr server reload-config` ran without errors and that `fzf` and `jq` are
+on PATH; an "openr" toast reports most failures.
 
 ## Configure
 
-`~/.config/herdr/plugins/config/openr/openr.conf` (shell syntax, created on
-first install — all keys optional):
+All optional — the defaults work as installed.
+`~/.config/herdr/plugins/config/openr/openr.conf` (shell syntax):
 
 ```sh
-# what to run on selection; {file} {line} {url} are replaced
-file_cmd='nvim +{line} "{file}"'
+# what to run on selection; {file} {line} {url} are replaced.
+# Use bare {file}/{url} — values are shell-escaped before substitution.
+file_cmd='nvim +{line} {file}'
 # "tab" = run file_cmd in a new herdr tab (terminal editors)
 # "detached" = run it outside herdr (GUI editors)
 file_open_in="tab"
@@ -96,10 +105,10 @@ file_open_in="tab"
 url_cmd=""
 
 # editor presets — uncomment one pair:
-#   VS Code:  file_open_in="detached"; file_cmd='code --goto "{file}:{line}"'
-#   Zed:      file_open_in="detached"; file_cmd='zed "{file}:{line}"'
-#   Sublime:  file_open_in="detached"; file_cmd='subl "{file}:{line}"'
-#   Helix:    file_open_in="tab";      file_cmd='hx "{file}:{line}"'
+#   VS Code:  file_open_in="detached"; file_cmd='code --goto {file}:{line}'
+#   Zed:      file_open_in="detached"; file_cmd='zed {file}:{line}'
+#   Sublime:  file_open_in="detached"; file_cmd='subl {file}:{line}'
+#   Helix:    file_open_in="tab";      file_cmd='hx {file}:{line}'
 
 # fzf preview pane on/off
 preview="1"
