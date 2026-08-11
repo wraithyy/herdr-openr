@@ -1,0 +1,26 @@
+id = "openr"
+name = "Openr"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Fuzzy-pick recently mentioned file paths and URLs from the current pane; URLs open in the browser, files in a running Neovim (or a new split)."
+platforms = ["macos", "linux"]
+
+[[actions]]
+id = "pick"
+title = "Openr: open file/URL from current pane"
+contexts = ["workspace"]
+command = ["bash", "bin/open.sh"]
+
+[[panes]]
+id = "picker"
+title = "Openr"
+placement = "popup"
+command = ["zsh", "-c", "exec \"$HERDR_PLUGIN_ROOT/bin/pane-pick\""]
+
+# Bind in ~/.config/herdr/config.toml, then `herdr server reload-config`:
+#
+#   [[keys.command]]
+#   key = "prefix+o"
+#   type = "plugin_action"
+#   command = "openr.pick"
+#   description = "open file/URL from pane"

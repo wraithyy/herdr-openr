@@ -1,0 +1,97 @@
+#!/usr/bin/env zsh
+# Pane `openr.picker`: fzf over file paths + URLs recently printed in the
+# origin pane (OPENR_PANE/OPENR_CWD set by open.sh). Enter opens: URLs via
+# the system opener, files in a running Neovim (newest server socket) or a
+# new herdr split when none is listening.
+set -u
+
+herdr_bin="${HERDR_BIN_PATH:-herdr}"
+pane="${OPENR_PANE:?OPENR_PANE not set}"
+cwd="${OPENR_CWD:-$HOME}"
+
+die() {
+  print -u2 "$*"
+  print -nu2 'Press any key to close…'
+  read -k1 -s 2>/dev/null || sleep 2
+  exit 1
+}
+command -v fzf >/dev/null || die "openr: fzf not installed"
+command -v jq  >/dev/null || die "openr: jq not installed"
+
+text="$("$herdr_bin" pane read "$pane" --source recent-unwrapped --lines 400 2>/dev/null \
+  | jq -r '.result.text // empty' 2>/dev/null)"
+[[ -n $text ]] || die "openr: could not read pane $pane"
+
+# URLs, then path-looking tokens (must contain / or end .ext[:line]); paths are
+# kept only if they exist relative to the pane cwd (or absolute) — that filter
+# kills nearly all false positives. Last mention wins ordering (newest first).
+candidates="$(
+  printf '%s\n' "$text" | awk -v cwd="$cwd" '
+    {
+      while (match($0, /https?:\/\/[^[:space:]"'"'"')\]>]+/)) {
+        print "url\t" substr($0, RSTART, RLENGTH)
+        $0 = substr($0, RSTART + RLENGTH)
+      }
+    }
+    {
+      line = $0
+      while (match(line, /([A-Za-z0-9_.@~-]+\/[A-Za-z0-9_.@~\/-]+|[A-Za-z0-9_@~][A-Za-z0-9_.@~\/-]*\.[A-Za-z0-9]{1,10})(:[0-9]+)?/)) {
+        tok = substr(line, RSTART, RLENGTH)
+        line = substr(line, RSTART + RLENGTH)
+        print "file\t" tok
+      }
+    }
+  ' | awk '!seen[$0]++' | tail -r | awk -F'\t' -v cwd="$cwd" '
+    $1 == "url" { print; next }
+    {
+      p = $2; sub(/:[0-9]+$/, "", p)
+      sub(/^~/, ENVIRON["HOME"], p)
+      abs = (p ~ /^\//) ? p : cwd "/" p
+      if (system("test -e \"" abs "\"") == 0) print
+    }
+  ' | awk '!seen[$2]++'
+)"
+[[ -n $candidates ]] || die "openr: nothing openable found in pane output"
+
+choice="$(printf '%s\n' "$candidates" | fzf \
+  --delimiter=$'\t' --with-nth=2 \
+  --prompt='open ▸ ' \
+  --header='enter open · esc cancel' \
+  --reverse --cycle --no-multi --no-sort)" || exit 0
+[[ -n $choice ]] || exit 0
+
+kind="${choice%%$'\t'*}"
+target="${choice#*$'\t'}"
+
+if [[ $kind == url ]]; then
+  open "$target"
+  exit 0
+fi
+
+# file: split off :line, resolve against pane cwd
+lineno=""
+if [[ $target == *:<-> ]]; then
+  lineno="${target##*:}"
+  target="${target%:*}"
+fi
+target="${target/#\~/$HOME}"
+[[ $target == /* ]] || target="$cwd/$target"
+
+# newest live nvim server socket wins
+# ponytail: picks most recent nvim regardless of workspace; match cwd if it misfires
+sock=""
+for s in ${TMPDIR:-/tmp}/nvim.$USER/*/nvim.*.0(N.Om); do
+  sock="$s"; break
+done
+
+if [[ -n $sock ]] && nvim --server "$sock" --remote "$target" 2>/dev/null; then
+  [[ -n $lineno ]] && nvim --server "$sock" --remote-send "<C-\\><C-N>${lineno}G" 2>/dev/null
+else
+  # no nvim listening — open one in a split next to the origin pane
+  new_pane="$("$herdr_bin" pane split "$pane" --direction right --focus --cwd "$cwd" 2>/dev/null \
+    | jq -r '.result.pane.pane_id // .result.pane_id // empty')"
+  [[ -n $new_pane ]] || die "openr: split failed"
+  "$herdr_bin" pane send-text "$new_pane" "nvim ${lineno:+"+$lineno "}\"$target\"
+"
+fi
+exit 0
