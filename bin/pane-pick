@@ -43,7 +43,7 @@ trap 'rm -f "$list"' EXIT
 preview_args=()
 if [[ $preview == 1 ]]; then
   plugin_root="${HERDR_PLUGIN_ROOT:-${0:A:h:h}}"
-  preview_args=(--preview "${(q)plugin_root}/bin/preview {1} {2} ${(q)cwd}" --preview-window 'right:55%')
+  preview_args=(--preview "${(q)plugin_root}/bin/preview {1} {2} ${(q)cwd}" --preview-window 'right:55%:wrap')
 fi
 
 out="$(fzf < "$list" \
