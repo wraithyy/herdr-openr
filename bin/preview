@@ -15,6 +15,13 @@ fi
 target="${target/#\~/$HOME}"
 [[ $target == /* ]] || target="$cwd/$target"
 
+# header: long paths get ellipsized on the left in the list, so show the
+# file name prominently above the preview
+bold=$'\e[1m'; dim=$'\e[2m'; reset=$'\e[0m'
+print -r -- "${bold}${target:t}${reset}${lineno:+ ${dim}:$lineno${reset}}"
+print -r -- "${dim}${target:h}${reset}"
+print -r -- "${dim}${(l:200::─:)}${reset}"
+
 if [[ -d $target ]]; then
   ls -la "$target"
 elif command -v bat >/dev/null; then
