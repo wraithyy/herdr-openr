@@ -7,9 +7,11 @@ herdr_bin="${HERDR_BIN_PATH:-herdr}"
 config="${XDG_CONFIG_HOME:-$HOME/.config}/herdr/config.toml"
 
 toast() { "$herdr_bin" notification show "openr" --body "$1" 2>/dev/null; }
+# on server startup runs, stay silent unless we actually change something
+quiet="${HERDR_PLUGIN_EVENT:-}"
 
 if grep -q 'command = "openr.pick"' "$config" 2>/dev/null; then
-  toast "already bound — nothing to do"
+  [ "$quiet" = "startup" ] || toast "already bound — nothing to do"
   exit 0
 fi
 if grep -q 'key = "prefix+o"' "$config" 2>/dev/null; then

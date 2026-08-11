@@ -25,12 +25,14 @@ the visible viewport; paths that don't exist are dropped.
 
 ```bash
 herdr plugin install wraithyy/herdr-openr
-herdr plugin action invoke openr.install-keybind   # binds prefix+o
+herdr plugin action invoke openr.install-keybind   # binds prefix+o now
 ```
 
-(prefix = herdr's leader key, ctrl+b by default. Different key? Skip the
-second command and add a `[[keys.command]]` with `command = "openr.pick"`
-to `~/.config/herdr/config.toml` yourself.)
+The second command is optional — a startup hook binds `prefix+o` by itself
+on the next herdr server start. (prefix = herdr's leader key, ctrl+b by
+default. Different key? Add a `[[keys.command]]` with
+`command = "openr.pick"` to `~/.config/herdr/config.toml` yourself — the
+hook never touches existing bindings.)
 
 Needs `zsh`, `fzf`, `jq` (`bat` optional, nicer preview). macOS + Linux.
 

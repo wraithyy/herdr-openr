@@ -17,6 +17,10 @@ title = "Openr: bind prefix+o in config.toml"
 contexts = ["global", "workspace"]
 command = ["bash", "bin/install-keybind.sh"]
 
+# binds prefix+o on first server start after install (silent no-op once bound)
+[[startup]]
+command = ["bash", "bin/install-keybind.sh"]
+
 [[panes]]
 id = "picker"
 title = "Openr"
