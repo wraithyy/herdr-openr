@@ -25,16 +25,12 @@ the visible viewport; paths that don't exist are dropped.
 
 ```bash
 herdr plugin install wraithyy/herdr-openr
-cat >> ~/.config/herdr/config.toml <<'EOF'
-
-[[keys.command]]
-key = "prefix+o"           # prefix = herdr's leader key, ctrl+b by default
-type = "plugin_action"
-command = "openr.pick"
-description = "open file/URL from pane"
-EOF
-herdr server reload-config
+herdr plugin action invoke openr.install-keybind   # binds prefix+o
 ```
+
+(prefix = herdr's leader key, ctrl+b by default. Different key? Skip the
+second command and add a `[[keys.command]]` with `command = "openr.pick"`
+to `~/.config/herdr/config.toml` yourself.)
 
 Needs `zsh`, `fzf`, `jq` (`bat` optional, nicer preview). macOS + Linux.
 

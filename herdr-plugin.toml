@@ -11,6 +11,12 @@ title = "Openr: open file/URL from current pane"
 contexts = ["workspace"]
 command = ["bash", "bin/open.sh"]
 
+[[actions]]
+id = "install-keybind"
+title = "Openr: bind prefix+o in config.toml"
+contexts = ["global", "workspace"]
+command = ["bash", "bin/install-keybind.sh"]
+
 [[panes]]
 id = "picker"
 title = "Openr"
