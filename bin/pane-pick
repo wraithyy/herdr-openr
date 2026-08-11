@@ -8,6 +8,7 @@ set -u
 herdr_bin="${HERDR_BIN_PATH:-herdr}"
 pane="${OPENR_PANE:?OPENR_PANE not set}"
 cwd="${OPENR_CWD:-$HOME}"
+list="${OPENR_LIST:?OPENR_LIST not set}"
 
 die() {
   print -u2 "$*"
@@ -16,44 +17,10 @@ die() {
   exit 1
 }
 command -v fzf >/dev/null || die "openr: fzf not installed"
-command -v jq  >/dev/null || die "openr: jq not installed"
+[[ -s $list ]] || die "openr: candidate list missing"
+trap 'rm -f "$list"' EXIT
 
-# pane read prints plain text (not JSON)
-text="$("$herdr_bin" pane read "$pane" --source recent-unwrapped --lines 400 2>/dev/null)"
-[[ -n $text ]] || die "openr: could not read pane $pane"
-
-# URLs, then path-looking tokens (must contain / or end .ext[:line]); paths are
-# kept only if they exist relative to the pane cwd (or absolute) — that filter
-# kills nearly all false positives. Last mention wins ordering (newest first).
-candidates="$(
-  printf '%s\n' "$text" | awk -v cwd="$cwd" '
-    {
-      while (match($0, /https?:\/\/[^[:space:]"'"'"')\]>]+/)) {
-        print "url\t" substr($0, RSTART, RLENGTH)
-        $0 = substr($0, RSTART + RLENGTH)
-      }
-    }
-    {
-      line = $0
-      while (match(line, /([A-Za-z0-9_.@~-]+\/[A-Za-z0-9_.@~\/-]+|[A-Za-z0-9_@~][A-Za-z0-9_.@~\/-]*\.[A-Za-z0-9]{1,10})(:[0-9]+)?/)) {
-        tok = substr(line, RSTART, RLENGTH)
-        line = substr(line, RSTART + RLENGTH)
-        print "file\t" tok
-      }
-    }
-  ' | awk '!seen[$0]++' | tail -r | awk -F'\t' -v cwd="$cwd" '
-    $1 == "url" { print; next }
-    {
-      p = $2; sub(/:[0-9]+$/, "", p)
-      sub(/^~/, ENVIRON["HOME"], p)
-      abs = (p ~ /^\//) ? p : cwd "/" p
-      if (system("test -e \"" abs "\"") == 0) print
-    }
-  ' | awk '!seen[$2]++'
-)"
-[[ -n $candidates ]] || die "openr: nothing openable found in pane output"
-
-choice="$(printf '%s\n' "$candidates" | fzf \
+choice="$(fzf < "$list" \
   --delimiter=$'\t' --with-nth=2 \
   --prompt='open ▸ ' \
   --header='enter open · esc cancel' \
