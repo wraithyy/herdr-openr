@@ -76,6 +76,10 @@ fi
 cmd="${file_cmd//\{file\}/$target}"
 cmd="${cmd//\{line\}/$lineno}"
 
+# debug trail for "it opened the wrong thing" reports
+print -r -- "$(date '+%H:%M:%S') kind=$kind key=$key target=$target line=$lineno cmd=$cmd" \
+  >> "$HOME/.config/herdr/plugins/config/openr/last.log" 2>/dev/null
+
 if [[ $file_open_in == detached ]]; then
   nohup zsh -c "$cmd" >/dev/null 2>&1 &!
   exit 0
