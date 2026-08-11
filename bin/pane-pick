@@ -18,8 +18,8 @@ die() {
 command -v fzf >/dev/null || die "openr: fzf not installed"
 command -v jq  >/dev/null || die "openr: jq not installed"
 
-text="$("$herdr_bin" pane read "$pane" --source recent-unwrapped --lines 400 2>/dev/null \
-  | jq -r '.result.text // empty' 2>/dev/null)"
+# pane read prints plain text (not JSON)
+text="$("$herdr_bin" pane read "$pane" --source recent-unwrapped --lines 400 2>/dev/null)"
 [[ -n $text ]] || die "openr: could not read pane $pane"
 
 # URLs, then path-looking tokens (must contain / or end .ext[:line]); paths are
