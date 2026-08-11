@@ -1,0 +1,26 @@
+#!/usr/bin/env zsh
+# fzf preview helper: preview <kind> <target> <cwd>
+kind="$1"; target="$2"; cwd="${3:-$HOME}"
+
+if [[ $kind == url ]]; then
+  print -r -- "$target"
+  exit 0
+fi
+
+lineno=""
+if [[ $target == *:<-> ]]; then
+  lineno="${target##*:}"
+  target="${target%:*}"
+fi
+target="${target/#\~/$HOME}"
+[[ $target == /* ]] || target="$cwd/$target"
+
+if [[ -d $target ]]; then
+  ls -la "$target"
+elif command -v bat >/dev/null; then
+  args=()
+  [[ -n $lineno ]] && args+=(--highlight-line "$lineno" --line-range "$((lineno > 5 ? lineno - 5 : 1)):")
+  bat --color=always --style=numbers "${args[@]}" "$target"
+else
+  cat "$target"
+fi

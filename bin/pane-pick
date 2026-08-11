@@ -11,6 +11,8 @@ list="${OPENR_LIST:?OPENR_LIST not set}"
 
 file_cmd='nvim +{line} "{file}"'
 url_cmd='open "{url}"'
+file_open_in="tab"
+preview="1"
 conf="$HOME/.config/herdr/plugins/config/openr/openr.conf"
 [[ -r $conf ]] && source "$conf"
 
@@ -24,15 +26,46 @@ command -v fzf >/dev/null || die "openr: fzf not installed"
 [[ -s $list ]] || die "openr: candidate list missing"
 trap 'rm -f "$list"' EXIT
 
-choice="$(fzf < "$list" \
+# preview: file contents via bat/cat (with :line highlight), URLs as-is
+preview_args=()
+if [[ $preview == 1 ]]; then
+  preview_args=(--preview "${(q)HERDR_PLUGIN_ROOT}/bin/preview {1} {2} ${(q)cwd}" --preview-window 'right:55%')
+fi
+
+out="$(fzf < "$list" \
   --delimiter=$'\t' --with-nth=2 \
   --prompt='open ▸ ' \
-  --header='enter open · esc cancel' \
-  --reverse --cycle --no-multi --no-sort)" || exit 0
+  --header='enter open · ctrl-f finder · ctrl-y copy · esc cancel' \
+  --expect=ctrl-f,ctrl-y \
+  --reverse --cycle --no-multi --no-sort \
+  "${preview_args[@]}")" || exit 0
+
+key="${out%%$'\n'*}"
+choice="${out#*$'\n'}"
 [[ -n $choice ]] || exit 0
 
 kind="${choice%%$'\t'*}"
 target="${choice#*$'\t'}"
+
+# resolve file target: split off :line, expand ~, root against pane cwd
+lineno="1"
+if [[ $kind == file ]]; then
+  if [[ $target == *:<-> ]]; then
+    lineno="${target##*:}"
+    target="${target%:*}"
+  fi
+  target="${target/#\~/$HOME}"
+  [[ $target == /* ]] || target="$cwd/$target"
+fi
+
+case $key in
+  ctrl-y)
+    print -rn -- "$target" | pbcopy
+    exit 0 ;;
+  ctrl-f)
+    [[ $kind == file ]] && open -R "$target" || open "$target"
+    exit 0 ;;
+esac
 
 if [[ $kind == url ]]; then
   cmd="${url_cmd//\{url\}/$target}"
@@ -40,23 +73,18 @@ if [[ $kind == url ]]; then
   exit 0
 fi
 
-# file: split off :line, resolve against pane cwd
-lineno="1"
-if [[ $target == *:<-> ]]; then
-  lineno="${target##*:}"
-  target="${target%:*}"
-fi
-target="${target/#\~/$HOME}"
-[[ $target == /* ]] || target="$cwd/$target"
-
 cmd="${file_cmd//\{file\}/$target}"
 cmd="${cmd//\{line\}/$lineno}"
 
-# open in a new tab in the current workspace; the tab runs the default shell,
-# so hand it the command as typed input (TUI apps like nvim work this way)
+if [[ $file_open_in == detached ]]; then
+  nohup zsh -c "$cmd" >/dev/null 2>&1 &!
+  exit 0
+fi
+
+# terminal editor: new tab in the current workspace; pane run executes
+# directly — no racing the shell prompt with typed input
 new_pane="$("$herdr_bin" tab create --cwd "$cwd" --focus 2>/dev/null \
   | jq -r '.result.root_pane.pane_id // empty')"
 [[ -n $new_pane ]] || die "openr: tab create failed"
-# pane run executes directly — no racing the shell prompt with typed input
 "$herdr_bin" pane run "$new_pane" "$cmd"
 exit 0
