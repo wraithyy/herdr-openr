@@ -21,14 +21,43 @@ fi
 # scroll the origin pane while the server reads it
 scan_source="visible"
 scan_lines=400
+transcript_lines=1000
 conf="$HOME/.config/herdr/plugins/config/openr/openr.conf"
 # shellcheck disable=SC1090
 [ -r "$conf" ] && . "$conf"
 
+# Claude panes: read the session transcript instead of scraping the screen —
+# full history, exact tool-call paths, and zero pane reads (nothing scrolls).
+# The transcript text feeds the same extraction pipeline as pane content.
+transcript=""
+pane_json="$("$herdr_bin" pane get "$pane_id" 2>/dev/null)"
+if [ "$(printf '%s' "$pane_json" | jq -r '.result.pane.agent // empty')" = "claude" ]; then
+  sid="$(printf '%s' "$pane_json" | jq -r '.result.pane.agent_session.value // empty')"
+  pane_cwd="$(printf '%s' "$pane_json" | jq -r '.result.pane.cwd // empty')"
+  if [ -n "$sid" ] && [ -n "$pane_cwd" ]; then
+    slug="$(printf '%s' "$pane_cwd" | sed 's/[\/.]/-/g')"
+    t="$HOME/.claude/projects/$slug/$sid.jsonl"
+    [ -r "$t" ] && transcript="$t"
+  fi
+fi
+
+scan_text() {
+  if [ -n "$transcript" ]; then
+    # tool_use file paths as their own lines + message text (URLs, mentions)
+    tail -n "$transcript_lines" "$transcript" | jq -Rr 'fromjson?
+      | .message.content[]?
+      | if .type == "tool_use" then (.input.file_path // .input.notebook_path // empty)
+        elif .type == "text" then .text
+        else empty end' 2>/dev/null
+  else
+    "$herdr_bin" pane read "$pane_id" --source "$scan_source" --lines "$scan_lines" 2>/dev/null
+  fi
+}
+
 # URLs, then path-looking tokens (with a slash, or ending .ext[:line]).
 # Dedupe, newest mention first.
 candidates="$(
-  "$herdr_bin" pane read "$pane_id" --source "$scan_source" --lines "$scan_lines" 2>/dev/null | awk '
+  scan_text | awk '
     {
       while (match($0, /https?:\/\/[^[:space:]"'"'"')\]>]+/)) {
         print "url\t" substr($0, RSTART, RLENGTH)
@@ -50,18 +79,22 @@ candidates="$(
 list="$(mktemp "${TMPDIR:-/tmp}/openr.XXXXXX")"
 while IFS=$'\t' read -r kind tok; do
   if [ "$kind" = "url" ]; then
-    printf 'url\t%s\n' "$tok"
+    printf 'url\t%s\t%s\n' "$tok" "$tok"
     continue
   fi
   p="${tok%%:[0-9]*}"
   p="${p/#\~/$HOME}"
-  case "$p" in /*) abs="$p" ;; *) abs="$cwd/$p" ;; esac
+  case "$p" in
+    /dev/*) continue ;;
+    /*) abs="$p" ;;
+    *) abs="$cwd/$p" ;;
+  esac
   if [ -d "$abs" ]; then
-    printf 'file\t%s/\n' "${tok%/}"
+    printf 'file\t%s/\t%s\n' "${tok%/}" "$abs"
   elif [ -e "$abs" ]; then
-    printf 'file\t%s\n' "$tok"
+    printf 'file\t%s\t%s\n' "$tok" "$abs"
   fi
-done <<< "$candidates" | awk -F'\t' '!seen[$2]++' > "$list"
+done <<< "$candidates" | awk -F'\t' '!seen[$3]++ { print $1 "\t" $2 }' > "$list"
 
 if [ ! -s "$list" ]; then
   rm -f "$list"
