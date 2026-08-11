@@ -16,10 +16,17 @@ fi
 [ -n "$pane_id" ] || exit 1
 [ -d "$cwd" ] || cwd="$HOME"
 
+# user config (scan_source/scan_lines here; file_cmd/url_cmd read by the picker)
+scan_source="recent"
+scan_lines=400
+conf="$HOME/.config/herdr/plugins/config/openr/openr.conf"
+# shellcheck disable=SC1090
+[ -r "$conf" ] && . "$conf"
+
 # URLs, then path-looking tokens (with a slash, or ending .ext[:line]).
 # Dedupe, newest mention first.
 candidates="$(
-  "$herdr_bin" pane read "$pane_id" --source recent-unwrapped --lines 400 2>/dev/null | awk '
+  "$herdr_bin" pane read "$pane_id" --source "$scan_source" --lines "$scan_lines" 2>/dev/null | awk '
     {
       while (match($0, /https?:\/\/[^[:space:]"'"'"')\]>]+/)) {
         print "url\t" substr($0, RSTART, RLENGTH)
@@ -56,12 +63,12 @@ if [ ! -s "$list" ]; then
   exit 0
 fi
 
+# overlay, not popup: fzf's full-screen redraw scroll-glitches in popup panes,
+# overlay is the same placement the command-palette plugin uses without issues
 exec "$herdr_bin" plugin pane open \
   --plugin openr \
   --entrypoint picker \
-  --placement popup \
-  --width "70%" \
-  --height "50%" \
+  --placement overlay \
   --env "OPENR_LIST=$list" \
   --env "OPENR_PANE=$pane_id" \
   --env "OPENR_CWD=$cwd" \

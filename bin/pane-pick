@@ -1,14 +1,18 @@
 #!/usr/bin/env zsh
-# Pane `openr.picker`: fzf over file paths + URLs recently printed in the
-# origin pane (OPENR_PANE/OPENR_CWD set by open.sh). Enter opens: URLs via
-# the system opener, files in a running Neovim (newest server socket) or a
-# new herdr split when none is listening.
+# Pane `openr.picker`: fzf over the pre-extracted candidate list (built by
+# open.sh, passed via OPENR_LIST). Enter opens: URLs via url_cmd (detached),
+# files via file_cmd inside a new tab in the current workspace. Both commands
+# come from openr.conf; {file} {line} {url} are placeholders.
 set -u
 
 herdr_bin="${HERDR_BIN_PATH:-herdr}"
-pane="${OPENR_PANE:?OPENR_PANE not set}"
 cwd="${OPENR_CWD:-$HOME}"
 list="${OPENR_LIST:?OPENR_LIST not set}"
+
+file_cmd='nvim +{line} "{file}"'
+url_cmd='open "{url}"'
+conf="$HOME/.config/herdr/plugins/config/openr/openr.conf"
+[[ -r $conf ]] && source "$conf"
 
 die() {
   print -u2 "$*"
@@ -31,12 +35,13 @@ kind="${choice%%$'\t'*}"
 target="${choice#*$'\t'}"
 
 if [[ $kind == url ]]; then
-  open "$target"
+  cmd="${url_cmd//\{url\}/$target}"
+  nohup zsh -c "$cmd" >/dev/null 2>&1 &!
   exit 0
 fi
 
 # file: split off :line, resolve against pane cwd
-lineno=""
+lineno="1"
 if [[ $target == *:<-> ]]; then
   lineno="${target##*:}"
   target="${target%:*}"
@@ -44,21 +49,14 @@ fi
 target="${target/#\~/$HOME}"
 [[ $target == /* ]] || target="$cwd/$target"
 
-# newest live nvim server socket wins
-# ponytail: picks most recent nvim regardless of workspace; match cwd if it misfires
-sock=""
-for s in ${TMPDIR:-/tmp}/nvim.$USER/*/nvim.*.0(N.Om); do
-  sock="$s"; break
-done
+cmd="${file_cmd//\{file\}/$target}"
+cmd="${cmd//\{line\}/$lineno}"
 
-if [[ -n $sock ]] && nvim --server "$sock" --remote "$target" 2>/dev/null; then
-  [[ -n $lineno ]] && nvim --server "$sock" --remote-send "<C-\\><C-N>${lineno}G" 2>/dev/null
-else
-  # no nvim listening — open one in a split next to the origin pane
-  new_pane="$("$herdr_bin" pane split "$pane" --direction right --focus --cwd "$cwd" 2>/dev/null \
-    | jq -r '.result.pane.pane_id // .result.pane_id // empty')"
-  [[ -n $new_pane ]] || die "openr: split failed"
-  "$herdr_bin" pane send-text "$new_pane" "nvim ${lineno:+"+$lineno "}\"$target\"
+# open in a new tab in the current workspace; the tab runs the default shell,
+# so hand it the command as typed input (TUI apps like nvim work this way)
+new_pane="$("$herdr_bin" tab create --cwd "$cwd" --focus 2>/dev/null \
+  | jq -r '.result.root_pane.pane_id // empty')"
+[[ -n $new_pane ]] || die "openr: tab create failed"
+"$herdr_bin" pane send-text "$new_pane" "$cmd
 "
-fi
 exit 0
