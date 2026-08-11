@@ -57,6 +57,9 @@ cmd="${cmd//\{line\}/$lineno}"
 new_pane="$("$herdr_bin" tab create --cwd "$cwd" --focus 2>/dev/null \
   | jq -r '.result.root_pane.pane_id // empty')"
 [[ -n $new_pane ]] || die "openr: tab create failed"
+# wait for the shell prompt before typing — p10k instant prompt can eat
+# keystrokes that arrive while the shell is still starting
+"$herdr_bin" pane wait-output "$new_pane" --regex '[❯$%#] *$' --timeout 3000 >/dev/null 2>&1
 "$herdr_bin" pane send-text "$new_pane" "$cmd
 "
 exit 0

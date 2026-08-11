@@ -17,7 +17,9 @@ fi
 [ -d "$cwd" ] || cwd="$HOME"
 
 # user config (scan_source/scan_lines here; file_cmd/url_cmd read by the picker)
-scan_source="recent"
+# visible by default: history sources (recent/recent-unwrapped) visibly
+# scroll the origin pane while the server reads it
+scan_source="visible"
 scan_lines=400
 conf="$HOME/.config/herdr/plugins/config/openr/openr.conf"
 # shellcheck disable=SC1090
