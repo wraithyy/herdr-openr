@@ -56,7 +56,11 @@ while IFS=$'\t' read -r kind tok; do
   p="${tok%%:[0-9]*}"
   p="${p/#\~/$HOME}"
   case "$p" in /*) abs="$p" ;; *) abs="$cwd/$p" ;; esac
-  [ -e "$abs" ] && printf 'file\t%s\n' "$tok"
+  if [ -d "$abs" ]; then
+    printf 'file\t%s/\n' "${tok%/}"
+  elif [ -e "$abs" ]; then
+    printf 'file\t%s\n' "$tok"
+  fi
 done <<< "$candidates" | awk -F'\t' '!seen[$2]++' > "$list"
 
 if [ ! -s "$list" ]; then
