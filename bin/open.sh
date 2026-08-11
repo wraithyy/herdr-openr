@@ -102,12 +102,12 @@ if [ ! -s "$list" ]; then
   exit 0
 fi
 
-# overlay, not popup: fzf's full-screen redraw scroll-glitches in popup panes,
-# overlay is the same placement the command-palette plugin uses without issues
 exec "$herdr_bin" plugin pane open \
   --plugin openr \
   --entrypoint picker \
-  --placement overlay \
+  --placement popup \
+  --width "${OPENR_WIDTH:-75%}" \
+  --height "${OPENR_HEIGHT:-60%}" \
   --env "OPENR_LIST=$list" \
   --env "OPENR_PANE=$pane_id" \
   --env "OPENR_CWD=$cwd" \
