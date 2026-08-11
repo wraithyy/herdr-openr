@@ -10,9 +10,18 @@ cwd="${OPENR_CWD:-$HOME}"
 list="${OPENR_LIST:?OPENR_LIST not set}"
 
 file_cmd='nvim +{line} "{file}"'
-url_cmd='open "{url}"'
+url_cmd=""            # default resolved per-platform below unless set in conf
 file_open_in="tab"
 preview="1"
+
+# platform helpers: macOS open/pbcopy vs Linux xdg-open/wl-copy/xclip
+opener() { command -v open >/dev/null && echo open || echo xdg-open }
+clip() {
+  if command -v pbcopy >/dev/null; then pbcopy
+  elif command -v wl-copy >/dev/null; then wl-copy
+  elif command -v xclip >/dev/null; then xclip -selection clipboard
+  else cat > /dev/null; fi
+}
 conf="$HOME/.config/herdr/plugins/config/openr/openr.conf"
 [[ -r $conf ]] && source "$conf"
 
@@ -35,7 +44,7 @@ fi
 out="$(fzf < "$list" \
   --delimiter=$'\t' --with-nth=2 \
   --prompt='open ▸ ' \
-  --header='enter open · ctrl-f finder · ctrl-y copy · esc cancel' \
+  --header='enter open · ctrl-f reveal · ctrl-y copy · esc cancel' \
   --expect=ctrl-f,ctrl-y \
   --reverse --cycle --no-multi --no-sort \
   "${preview_args[@]}")" || exit 0
@@ -60,14 +69,24 @@ fi
 
 case $key in
   ctrl-y)
-    print -rn -- "$target" | pbcopy
+    print -rn -- "$target" | clip
     exit 0 ;;
   ctrl-f)
-    [[ $kind == file ]] && open -R "$target" || open "$target"
+    # reveal in the file manager: Finder supports open -R, elsewhere open the dir
+    if [[ $kind == file ]]; then
+      if command -v open >/dev/null && [[ $OSTYPE == darwin* ]]; then
+        open -R "$target"
+      else
+        "$(opener)" "$(dirname "$target")"
+      fi
+    else
+      "$(opener)" "$target"
+    fi
     exit 0 ;;
 esac
 
 if [[ $kind == url ]]; then
+  [[ -n $url_cmd ]] || url_cmd="$(opener) \"{url}\""
   cmd="${url_cmd//\{url\}/$target}"
   nohup zsh -c "$cmd" >/dev/null 2>&1 &!
   exit 0

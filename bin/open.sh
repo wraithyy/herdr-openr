@@ -72,7 +72,7 @@ candidates="$(
         print "file\t" tok
       }
     }
-  ' | awk '!seen[$0]++' | tail -r
+  ' | awk '!seen[$0]++' | if command -v tac >/dev/null 2>&1; then tac; else tail -r; fi
 )"
 
 # keep files that actually exist (relative to the pane cwd); no subshell forks
