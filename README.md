@@ -2,7 +2,8 @@
 
 Jump to what your agent just did. One keypress → fuzzy picker over the
 files and URLs the current pane mentioned. URLs open in your browser,
-files in your editor at the right line.
+files in your editor at the right line — or reveal them in Finder /
+your file manager, or copy the path.
 
 ![openr demo](assets/demo.gif)
 
