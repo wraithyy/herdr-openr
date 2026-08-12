@@ -4,16 +4,7 @@ Jump to what your agent just did. One keypress → fuzzy picker over the
 files and URLs the current pane mentioned. URLs open in your browser,
 files in your editor at the right line.
 
-```
-╭─ open ▸ ────────────────────────────────┬──────────────────────────────╮
-│ enter open · ctrl-f reveal · ctrl-y copy│  70 │ [[keys.command]]       │
-│                                         │  71 │ key = "prefix+o"       │
-│ > dot_config/herdr/config.toml:71       │  72 │ type = "plugin_action" │
-│   src/ui/keybind_help.rs                │  73 │ command = "openr.pick" │
-│   ~/Development/herdr-openr/            │     │                        │
-│   https://herdr.dev/docs/plugins/       │     │                        │
-╰─────────────────────────────────────────┴──────────────────────────────╯
-```
+![openr demo](assets/demo.gif)
 
 **Claude Code panes don't scrape the screen** — openr reads the session
 transcript (`~/.claude/projects/<project>/<session>.jsonl`, resolved via
@@ -73,6 +64,14 @@ Popup size: `OPENR_WIDTH` / `OPENR_HEIGHT` (default `75%` / `60%`).
 - Paths with spaces are not detected (known limit).
 - `~/.config/herdr/plugins/config/openr/last.log` = last dispatched
   command, `last-source.log` = last scanned pane + source.
+
+## Prior art
+
+Inspired by [termscope](https://github.com/iurysza/termscope), which pioneered
+the "open what's on screen" jump list for herdr. openr grew out of wanting a
+different shape of the same idea: Claude transcript as the primary source
+instead of the viewport, a popup picker, and a configurable editor command
+instead of a fixed nvim split.
 
 ## License
 
