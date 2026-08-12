@@ -53,6 +53,9 @@ transcript_lines=1000            # agent panes
 # VS Code:  file_open_in="detached"; file_cmd='code --goto {file}:{line}'
 # Zed:      file_open_in="detached"; file_cmd='zed {file}:{line}'
 # Helix:    file_open_in="tab";      file_cmd='hx {file}:{line}'
+# IntelliJ: file_open_in="detached"; file_cmd='idea --line {line} {file}'
+#   (needs the `idea` shell launcher; macOS without it:
+#    file_cmd='open -na "IntelliJ IDEA" --args --line {line} {file}')
 ```
 
 Popup size: `OPENR_WIDTH` / `OPENR_HEIGHT` (default `75%` / `60%`).
