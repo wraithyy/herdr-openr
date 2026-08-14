@@ -7,24 +7,28 @@ your file manager, or copy the path.
 
 ![openr demo](assets/demo.gif)
 
-**Claude Code panes don't scrape the screen** — openr reads the session
-transcript (`~/.claude/projects/<project>/<session>.jsonl`, resolved via
-the herdr API): exact paths from every Edit/Write/Read tool call, whole
-session history, zero false positives, zero pane reads. Other panes scan
-the visible viewport; paths that don't exist are dropped.
+Two modes, two keys: `prefix+o` scans the **visible viewport** of any pane;
+`prefix+shift+o` reads the **Claude session transcript**
+(`~/.claude/projects/<project>/<session>.jsonl`, resolved via the herdr
+API) — exact paths from every Edit/Write/Read tool call, whole session
+history, zero pane reads. Paths that don't exist are dropped.
+
+There's also `openr.pick` (auto: Claude pane → transcript, otherwise
+viewport) if you prefer one key for both — bind it yourself (example in
+`herdr-plugin.toml`).
 
 ## Quick start
 
 ```bash
 herdr plugin install wraithyy/herdr-openr
-herdr plugin action invoke openr.install-keybind   # binds prefix+o now
+herdr plugin action invoke openr.install-keybind   # binds the keys now
 ```
 
-The second command is optional — a startup hook binds `prefix+o` by itself
-on the next herdr server start. (prefix = herdr's leader key, ctrl+b by
-default. Different key? Add a `[[keys.command]]` with
-`command = "openr.pick"` to `~/.config/herdr/config.toml` yourself — the
-hook never touches existing bindings.)
+The second command is optional — a startup hook binds `prefix+o` (visible)
+and `prefix+shift+o` (transcript) by itself on the next herdr server start.
+(prefix = herdr's leader key, ctrl+b by default. Different keys? Add your
+own `[[keys.command]]` entries to `~/.config/herdr/config.toml` — the hook
+never touches existing bindings.)
 
 Needs `zsh`, `fzf`, `jq` (`bat` optional, nicer preview). macOS + Linux.
 

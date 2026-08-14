@@ -5,6 +5,10 @@
 # only runs fzf, so it opens instantly.
 set -uo pipefail
 
+# mode: auto (default) = transcript for claude panes, pane read otherwise;
+# visible = always read the pane viewport; transcript = claude transcript only
+mode="${1:-auto}"
+
 herdr_bin="${HERDR_BIN_PATH:-herdr}"
 ctx="${HERDR_PLUGIN_CONTEXT_JSON:-}"
 
@@ -36,6 +40,7 @@ conf="$HOME/.config/herdr/plugins/config/openr/openr.conf"
 # full history, exact tool-call paths, and zero pane reads (nothing scrolls).
 # The transcript text feeds the same extraction pipeline as pane content.
 transcript=""
+if [ "$mode" != "visible" ]; then
 pane_json="$("$herdr_bin" pane get "$pane_id" 2>/dev/null)"
 if [ "$(printf '%s' "$pane_json" | jq -r '.result.pane.agent // empty')" = "claude" ]; then
   sid="$(printf '%s' "$pane_json" | jq -r '.result.pane.agent_session.value // empty')"
@@ -46,6 +51,12 @@ if [ "$(printf '%s' "$pane_json" | jq -r '.result.pane.agent // empty')" = "clau
     [ -r "$t" ] && transcript="$t"
   fi
 fi
+fi
+
+if [ "$mode" = "transcript" ] && [ -z "$transcript" ]; then
+  fail "no Claude transcript for this pane"
+fi
+[ "$mode" = "visible" ] && scan_source="visible"
 
 printf '%s src=%s pane=%s cwd=%s\n' "$(date '+%H:%M:%S')" \
   "${transcript:-pane-$scan_source}" "$pane_id" "$cwd" \

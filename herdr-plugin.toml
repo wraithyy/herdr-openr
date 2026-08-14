@@ -1,8 +1,8 @@
 id = "openr"
 name = "Openr"
-version = "0.2.0"
+version = "0.3.0"
 min_herdr_version = "0.7.0"
-description = "Fuzzy-pick recently mentioned file paths and URLs from the current pane (Claude panes: from the session transcript); URLs open in the browser, files in your editor in a new tab or detached."
+description = "Fuzzy-pick recently mentioned file paths and URLs from the current pane (prefix+o: visible content, prefix+shift+o: Claude session transcript); URLs open in the browser, files in your editor in a new tab or detached."
 platforms = ["macos", "linux"]
 
 [[actions]]
@@ -11,13 +11,27 @@ title = "Openr: open file/URL from current pane"
 contexts = ["workspace"]
 command = ["bash", "bin/open.sh"]
 
+# visible viewport only — never the Claude transcript
+[[actions]]
+id = "pick-visible"
+title = "Openr: open file/URL from visible pane content"
+contexts = ["workspace"]
+command = ["bash", "bin/open.sh", "visible"]
+
+# Claude session transcript only (fails on non-Claude panes)
+[[actions]]
+id = "pick-transcript"
+title = "Openr: open file/URL from Claude transcript"
+contexts = ["workspace"]
+command = ["bash", "bin/open.sh", "transcript"]
+
 [[actions]]
 id = "install-keybind"
-title = "Openr: bind prefix+o in config.toml"
+title = "Openr: bind prefix+o / prefix+shift+o in config.toml"
 contexts = ["global", "workspace"]
 command = ["bash", "bin/install-keybind.sh"]
 
-# binds prefix+o on first server start after install (silent no-op once bound)
+# binds the keys on first server start after install (silent no-op once bound)
 [[startup]]
 command = ["bash", "bin/install-keybind.sh"]
 
@@ -27,10 +41,19 @@ title = "Openr"
 placement = "popup"
 command = ["zsh", "-c", "exec \"$HERDR_PLUGIN_ROOT/bin/pane-pick\""]
 
-# Bind in ~/.config/herdr/config.toml, then `herdr server reload-config`:
+# Default binds (install-keybind writes these to ~/.config/herdr/config.toml):
 #
 #   [[keys.command]]
 #   key = "prefix+o"
 #   type = "plugin_action"
-#   command = "openr.pick"
-#   description = "open file/URL from pane"
+#   command = "openr.pick-visible"
+#   description = "open file/URL from visible pane"
+#
+#   [[keys.command]]
+#   key = "prefix+shift+o"
+#   type = "plugin_action"
+#   command = "openr.pick-transcript"
+#   description = "open file/URL from Claude transcript"
+#
+# `openr.pick` (auto: Claude pane → transcript, otherwise viewport) stays
+# available for a custom bind. After edits: `herdr server reload-config`.
