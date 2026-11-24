@@ -1,34 +1,47 @@
 // Openr for herdr-app: fuzzy-pick file paths and URLs mentioned in the focused
 // terminal, newest first. Sources: its visible screen, or (Claude panes) the
 // session transcript. Tab switches source. Enter opens (URL in the browser,
-// file in EDITOR in a new tab), ctrl+f reveals in Finder, ctrl+y copies.
+// file in EDITOR in a new tab), ctrl+f reveals in Finder / Explorer / the file manager,
+// ctrl+y copies. macOS, Windows and Linux.
 
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
-import { exec, hc, home, readTextFile, run, theme, props, closeOverlay, focused, notify } from "herdr";
+import { slug, isAbsolute, extract } from "./paths.js";
+import { exec, hc, home, readTextFile, run, theme, props, closeOverlay, focused, notify, window } from "herdr";
 
 // {file} and {line} are replaced; argv, never a shell string, so text
 // scraped from a terminal can't inject commands.
 const EDITOR = ["nvim", "+{line}", "{file}"];
 const TRANSCRIPT_LINES = 1000;
-const MAX_CANDIDATES = 300;
 const VISIBLE = 14;
 
-const URL_RE = /https?:\/\/[^\s"'`$()\]>]+/g;
-const PATH_RE = /(\/[A-Za-z0-9_.@~-][A-Za-z0-9_.@~\/-]*|[A-Za-z0-9_.@~-]+\/[A-Za-z0-9_.@~\/-]+|[A-Za-z0-9_@~][A-Za-z0-9_.@~\/-]*\.[A-Za-z0-9]+)(:[0-9]+)?/g;
+const platform = () => window()?.platform ?? "macos";
+// PowerShell single-quoted literal: only quotes (curly ones too) need doubling, so text
+// scraped from a terminal stays data.
+const psQuote = (text) => `'${String(text).replace(/['\u2018\u2019\u201a\u201b]/g, "$&$&")}'`;
+const ps = (script) => exec("powershell", ["-NoProfile", "-NonInteractive", "-Command", script]);
+const dirname = (p) => p.replace(/[\\/][^\\/]*$/, "") || "/";
 
-// Claude Code stores its transcript under the project folder with / and . turned into -.
-const slug = (cwd) => cwd.replace(/[/.]/g, "-");
+const openUrl = (url) => ({
+  windows: () => exec("rundll32", ["url.dll,FileProtocolHandler", url]),
+  linux: () => exec("xdg-open", [url]),
+}[platform()] ?? (() => exec("open", [url])))();
 
-function extract(text) {
-  const found = [];
-  for (const line of text.split("\n")) {
-    for (const m of line.matchAll(URL_RE)) found.push({ kind: "url", label: m[0] });
-    for (const m of line.replace(URL_RE, " ").matchAll(PATH_RE)) found.push({ kind: "file", label: m[0], line: m[2] ? m[2].slice(1) : "1" });
-  }
-  const seen = new Set();
-  return found.reverse().filter((c) => !seen.has(c.label) && seen.add(c.label)).slice(0, MAX_CANDIDATES);
-}
+const reveal = (path) => ({
+  windows: () => exec("explorer", [`/select,${path.replace(/\//g, "\\")}`]),
+  linux: () => exec("xdg-open", [dirname(path)]),
+}[platform()] ?? (() => exec("open", ["-R", path])))();
+
+const copyText = (text) => ({
+  windows: () => ps(`Set-Clipboard -Value ${psQuote(text)}`),
+  linux: () => exec("sh", ["-c", 'printf %s "$1" | (wl-copy 2>/dev/null || xclip -selection clipboard)', "sh", text]),
+}[platform()] ?? (() => exec("sh", ["-c", 'printf %s "$1" | pbcopy', "sh", text])))();
+
+// "d<path>" / "f<path>" per existing path, one process for all of them.
+const existence = (paths) => (platform() === "windows"
+  ? ps(`foreach ($p in @(${paths.map(psQuote).join(",") || "@()"})) { if (Test-Path -LiteralPath $p -PathType Container) { "d$p" } elseif (Test-Path -LiteralPath $p) { "f$p" } }`)
+  : exec("sh", ["-c", 'for p; do if [ -d "$p" ]; then echo "d$p"; elif [ -e "$p" ]; then echo "f$p"; fi; done', "sh", ...paths]));
+
 
 function matches(c, f) {
   const hay = c.label.toLowerCase();
@@ -107,12 +120,12 @@ export default class Openr extends View {
   async existing(cands) {
     const resolve = (p) => {
       p = p.replace(/:[0-9]+$/, "").replace(/^~(?=\/|$)/, home());
-      return p.startsWith("/") ? p : `${this.cwd}/${p}`;
+      return isAbsolute(p) ? p : `${this.cwd}/${p}`;
     };
     const files = cands.filter((c) => c.kind === "file" && !c.label.startsWith("/dev/"));
     files.forEach((c) => (c.abs = resolve(c.label)));
-    const r = await exec("sh", ["-c", 'for p; do if [ -d "$p" ]; then echo "d$p"; elif [ -e "$p" ]; then echo "f$p"; fi; done', "sh", ...files.map((c) => c.abs)]);
-    const kind = new Map(r.stdout.split("\n").filter(Boolean).map((l) => [l.slice(1), l[0]]));
+    const r = files.length ? await existence(files.map((c) => c.abs)).catch(() => null) : null;
+    const kind = new Map((r?.stdout ?? "").replace(/\r/g, "").split("\n").filter(Boolean).map((l) => [l.slice(1), l[0]]));
     const seen = new Set();
     return cands.filter((c) => {
       if (c.kind === "url") return true;
@@ -138,21 +151,21 @@ export default class Openr extends View {
   open(c) {
     if (!c) return;
     this.close();
-    if (c.kind === "url") return exec("open", [c.label]);
+    if (c.kind === "url") return openUrl(c.label);
     const argv = EDITOR.map((a) => a.replace("{file}", c.abs).replace("{line}", c.line));
-    run("tab.new", { name: c.abs.split("/").pop(), folder: this.cwd, argv });
+    run("tab.new", { name: c.abs.split(/[\\/]/).pop(), folder: this.cwd, argv });
   }
 
   reveal(c) {
     if (!c) return;
     this.close();
-    exec("open", c.kind === "url" ? [c.label] : ["-R", c.abs]);
+    if (c.kind === "url") openUrl(c.label); else reveal(c.abs);
   }
 
   copy(c) {
     if (!c) return;
     this.close();
-    exec("sh", ["-c", 'printf %s "$1" | pbcopy', "sh", this.target(c)]);
+    copyText(this.target(c));
     notify({ title: "openr", body: `copied ${this.target(c)}`, timeout: 2500 });
   }
 

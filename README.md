@@ -32,6 +32,13 @@ never touches existing bindings.)
 
 Needs `zsh`, `fzf`, `jq` (`bat` optional, nicer preview). macOS + Linux.
 
+### herdr-app (GUI) mod
+
+`herdr-app-mod/mods/openr` is the same picker as a herdr-app popup: no `zsh`/`fzf`
+needed, and it runs on macOS, Windows and Linux (browser, reveal and clipboard use each
+system's own tools; Windows drive paths like `C:\src\app.ts:12` are picked up). Link
+or copy the folder into `~/.config/herdr-app/mods/openr` and bind `mod.open:openr`.
+
 ## Keys
 
 | key | action |
